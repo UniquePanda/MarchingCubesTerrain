@@ -6,8 +6,9 @@
 int _Seed;
 float _Amplitude;
 float _Frequency;
-int _Octaves;
+uint _Octaves;
 float _GroundPercent;
+uint _GroundLevel;
 
 RWStructuredBuffer<float> _Weights;
 
@@ -19,9 +20,9 @@ void GenerateNoise(uint3 id : SV_DispatchThreadID) {
     noise.frequency = _Frequency;
     noise.octaves = _Octaves;
 
-    float3 pos = id;
-    float ground = -pos.y + (_GroundPercent * _ChunkSize);
+    float3 pos = (float3)id / (_ChunkSize - 1) * _Scale;
+    float ground = -pos.y + (_GroundPercent * _GroundLevel);
     float noiseValue = ground + fnlGetNoise3D(noise, pos.x, pos.y, pos.z) * _Amplitude;
 
-    _Weights[indexFromCoord(pos.x, pos.y, pos.z)] = noiseValue;
+    _Weights[indexFromCoord(id.x, id.y, id.z)] = noiseValue;
 }

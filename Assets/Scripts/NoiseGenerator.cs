@@ -14,37 +14,35 @@ public class NoiseGenerator : MonoBehaviour
 
     ComputeBuffer weightsBuffer;
 
-    void Awake() {
-        CreateBuffer();
-    }
-
-    void OnDestroy() {
-        ReleaseBuffer();
-    }
-
-    void CreateBuffer() {
-        weightsBuffer = new ComputeBuffer(GridMetrics.PointsPerGrid, sizeof(float));
+    void CreateBuffer(int lod) {
+        weightsBuffer = new ComputeBuffer(GridMetrics.PointsPerGrid(lod), sizeof(float));
     }
 
     void ReleaseBuffer() {
         weightsBuffer.Release();
     }
 
-    public float[] GetNoise() {
-        float[] noiseValues = new float[GridMetrics.PointsPerGrid];
+    public float[] GetNoise(int lod) {
+        CreateBuffer(lod);
+
+        float[] noiseValues = new float[GridMetrics.PointsPerGrid(lod)];
 
         noiseShader.SetBuffer(0, "_Weights", weightsBuffer);
 
         noiseShader.SetInt("_Seed", seed);
-        noiseShader.SetInt("_ChunkSize", GridMetrics.PointsPerChunk);
+        noiseShader.SetInt("_GroundLevel", GridMetrics.GroundLevel);
+        noiseShader.SetInt("_Scale", GridMetrics.Scale);
+        noiseShader.SetInt("_ChunkSize", GridMetrics.PointsPerChunk(lod));
         noiseShader.SetFloat("_Amplitude", amplitude);
         noiseShader.SetFloat("_Frequency", frequency);
         noiseShader.SetInt("_Octaves", octaves);
         noiseShader.SetFloat("_GroundPercent", groundPercent);
 
-        noiseShader.Dispatch(0, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread);
+        noiseShader.Dispatch(0, GridMetrics.ThreadGroups(lod), GridMetrics.ThreadGroups(lod), GridMetrics.ThreadGroups(lod));
 
         weightsBuffer.GetData(noiseValues);
+
+        ReleaseBuffer();
 
         return noiseValues;
     }

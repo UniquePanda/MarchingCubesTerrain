@@ -449,8 +449,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   noiseShader: {fileID: 7200000, guid: d67a8f6b47e8eda47aa50f152e1c4485, type: 3}
-  seed: 5555
-  amplitude: 22
+  seed: 1234
+  amplitude: 20
   frequency: 0.02
   octaves: 8
   groundPercent: 0.2
@@ -505,6 +505,7 @@ MonoBehaviour:
   meshCollider: {fileID: 2140908052}
   noiseGenerator: {fileID: 1524240220}
   marchingCubesShader: {fileID: 7200000, guid: 30cdcc4afa478a046adfcefa16bac08a, type: 3}
+  lod: 0
 --- !u!4 &2140908049
 Transform:
   m_ObjectHideFlags: 0
