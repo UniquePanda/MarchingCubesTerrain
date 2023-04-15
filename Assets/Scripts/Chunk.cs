@@ -5,6 +5,7 @@ using UnityEngine;
 public class Chunk : MonoBehaviour
 {
     public MeshFilter meshFilter;
+    public MeshCollider meshCollider;
     public NoiseGenerator noiseGenerator;
     public ComputeShader marchingCubesShader;
 
@@ -22,6 +23,8 @@ public class Chunk : MonoBehaviour
     ComputeBuffer trianglesCountBuffer;
     ComputeBuffer weightsBuffer;
 
+    Mesh mesh;
+
     void Awake() {
         CreateBuffers();
     }
@@ -33,27 +36,9 @@ public class Chunk : MonoBehaviour
     void Start() {
         weights = noiseGenerator.GetNoise();
 
-        meshFilter.sharedMesh = ConstructMesh();
+        mesh = new Mesh();
+        UpdateMesh();
     }
-
-    /*
-    void OnDrawGizmos() {
-        if (weights == null || weights.Length == 0) {
-            return;
-        }
-
-        for (int x = 0; x < GridMetrics.PointsPerChunk; x++) {
-            for (int y = 0; y < GridMetrics.PointsPerChunk; y++) {
-                for (int z = 0; z < GridMetrics.PointsPerChunk; z++) {
-                    int index = x + GridMetrics.PointsPerChunk * (y + GridMetrics.PointsPerChunk * z);
-                    float noiseValue = weights[index];
-                    Gizmos.color = Color.Lerp(Color.black, Color.white, noiseValue);
-                    Gizmos.DrawCube(new Vector3(x, y, z), Vector3.one * 0.2f);
-                }
-            }
-        }
-    }
-    */
 
     void CreateBuffers() {
         trianglesBuffer = new ComputeBuffer(5 * GridMetrics.PointsPerGrid, Triangle.SizeOf, ComputeBufferType.Append);
@@ -67,9 +52,17 @@ public class Chunk : MonoBehaviour
         weightsBuffer.Release();
     }
 
+    void UpdateMesh() {
+        mesh = ConstructMesh();
+        meshFilter.sharedMesh = mesh;
+        meshCollider.sharedMesh = mesh;
+    }
+
     Mesh ConstructMesh() {
-        marchingCubesShader.SetBuffer(0, "_Triangles", trianglesBuffer);
-        marchingCubesShader.SetBuffer(0, "_Weights", weightsBuffer);
+        int kernel = marchingCubesShader.FindKernel("March");
+
+        marchingCubesShader.SetBuffer(kernel, "_Triangles", trianglesBuffer);
+        marchingCubesShader.SetBuffer(kernel, "_Weights", weightsBuffer);
 
         marchingCubesShader.SetInt("_ChunkSize", GridMetrics.PointsPerChunk);
         marchingCubesShader.SetFloat("_IsoLevel", 0.5f);
@@ -77,7 +70,7 @@ public class Chunk : MonoBehaviour
         weightsBuffer.SetData(weights);
         trianglesBuffer.SetCounterValue(0);
 
-        marchingCubesShader.Dispatch(0, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread);
+        marchingCubesShader.Dispatch(kernel, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread);
 
         Triangle[] triangles = new Triangle[ReadTriangleCount()];
         trianglesBuffer.GetData(triangles);
@@ -107,11 +100,29 @@ public class Chunk : MonoBehaviour
             triangleIndices[startIndex + 2] = startIndex + 2;
         }
 
-        Mesh mesh = new Mesh();
+        mesh.Clear();
         mesh.vertices = vertices;
         mesh.triangles = triangleIndices;
         mesh.RecalculateNormals();
 
         return mesh;
+    }
+
+    public void EditWeights(Vector3 hitPosition, float brushSize, bool add) {
+        int kernel = marchingCubesShader.FindKernel("UpdateWeights");
+
+        weightsBuffer.SetData(weights);
+        marchingCubesShader.SetBuffer(kernel, "_Weights", weightsBuffer);
+
+        marchingCubesShader.SetInt("_ChunkSize", GridMetrics.PointsPerChunk);
+        marchingCubesShader.SetVector("_HitPosition", hitPosition);
+        marchingCubesShader.SetFloat("_BrushSize", brushSize);
+        marchingCubesShader.SetFloat("_TerraformStrength", add ? 1.0f : -1.0f);
+
+        marchingCubesShader.Dispatch(kernel, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread, GridMetrics.PointsPerChunkPerThread);
+
+        weightsBuffer.GetData(weights);
+
+        UpdateMesh();
     }
 }
